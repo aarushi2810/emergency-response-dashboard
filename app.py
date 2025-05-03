@@ -92,4 +92,8 @@ if __name__ == "__main__":
     if not os.path.exists("alerts.db"):
         with app.app_context():
             db.create_all()
+<<<<<<< HEAD
     app.run(debug=True)
+=======
+    app.run(debug=True)
+>>>>>>> 616c2fe (Add: Flask dashboard with logging and templates)

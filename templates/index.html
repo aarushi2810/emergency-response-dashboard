@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Alerts</title>
+</head>
+<body>
+    <h1>Send an Alert</h1>
+
+    <form action="/alert" method="POST">
+        <label for="message">Alert Message:</label><br>
+        <input type="text" id="message" name="message" required><br><br>
+
+        <label for="severity">Severity:</label><br>
+        <input type="text" id="severity" name="severity" required><br><br>
+
+        <label for="incident_type">Incident Type:</label><br>
+        <input type="text" id="incident_type" name="incident_type" required><br><br>
+
+        <input type="submit" value="Send Alert">
+    </form>
+
+    <h2>Previous Alerts</h2>
+    <ul>
+        {% for alert in alerts %}
+            <li>{{ alert.message }} - {{ alert.severity }} - {{ alert.incident_type }} 
+                ({{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }})</li>
+        {% endfor %}
+    </ul>
+
+</body>
+</html>

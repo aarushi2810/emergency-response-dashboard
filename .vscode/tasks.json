@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Run FastAPI App",
+        "type": "shell",
+        "command": "${workspaceFolder}/backend_env/bin/uvicorn",
+        "args": [
+          "app:app",
+          "--reload"
+        ],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": [],
+        "detail": "Runs the FastAPI server using uvicorn"
+      }
+    ]
+  }

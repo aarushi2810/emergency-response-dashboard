@@ -3,15 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Emergency Alerts Dashboard</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        h1 { color: #333; }
-        .filter-form { margin-bottom: 20px; }
-        .alert { border: 1px solid #ccc; padding: 12px; margin-bottom: 10px; border-left: 6px solid #007BFF; }
-        .pagination { margin-top: 20px; }
-        .pagination a { margin: 0 5px; text-decoration: none; }
-        .active-page { font-weight: bold; }
-    </style>
+<link rel="stylesheet" href="{{ url_for('templates', filename='style.css') }}" />
 </head>
 <body>
 <h1>Emergency Alerts Dashboard</h1>

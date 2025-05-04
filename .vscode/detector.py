@@ -62,6 +62,7 @@ try:
         print("📸 Frame captured, running YOLO...")
         results = model.predict(frame, stream=True)
         detected = False
+        alert_label = None
 
         # Loop through results and process detections
         for r in results:
@@ -81,15 +82,20 @@ try:
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
                     detected = True
+                    alert_label = label  # ✅ track label for alert
 
         # Send alert only once in the cooldown period
         if detected and (time.time() - last_alert_time > cooldown_seconds):
             try:
                 print("📱 Sending alert to server and SMS...")
-                requests.post("http://127.0.0.1:8000/alert", json={
-                    "type": label,  # from YOLO label
-                    "location": "Hostel Camera 1"
+                
+                response = requests.post("http://127.0.0.1:5000/alert", data={
+                    "message": f"{alert_label.capitalize()} detected at Hostel Camera 1",
+                    "severity": "high",  # or "medium", depending on context
+                    "incident_type": alert_label
                 })
+                print("🌐 Server responded with:", response.status_code, response.text)
+                    
                 send_sms_alert("🚨 Emergency detected by AI system!")
                 last_alert_time = time.time()
             except Exception as e:

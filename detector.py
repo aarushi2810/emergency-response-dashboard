@@ -1,63 +1,116 @@
-import cv2
+from twilio.rest import Client
 from ultralytics import YOLO
+import cv2
 import requests
 import time
+import os
+from dotenv import load_dotenv
 
-# Initialize YOLO model (you can use a smaller model for faster detection)
-model = YOLO("yolov8n.pt")  # You can use yolov8n.pt for better speed
+# Load environment variables
+load_dotenv()
 
-# Open the webcam
-cap = cv2.VideoCapture(0)
+account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+twilio_number = os.getenv("TWILIO_PHONE_NUMBER")
+your_phone_number = os.getenv("TARGET_PHONE_NUMBER")
 
-# Function to send alert to the server
-def send_alert_to_server(type, location):
+# Initialize Twilio client
+client = Client(account_sid, auth_token)
+
+# Cooldown to avoid spamming alerts
+last_alert_time = 0
+cooldown_seconds = 30  # Send alert only every 30 seconds
+
+# Filter only specific detections (based on class names in YOLO model)
+target_labels = ['person']  # You can add more relevant labels if using a custom model
+
+def send_sms_alert(message):
     try:
-        print("📡 Sending alert to server...")
-        response = requests.post(
-            "http://127.0.0.1:8000/alert",
-            json={"type": type, "location": location}
+        sms = client.messages.create(
+            body=message,
+            from_=twilio_number,
+            to=your_phone_number
         )
-        if response.status_code == 200:
-            print("✅ Alert sent successfully!")
-        else:
-            print(f"❌ Failed to send alert. Status code: {response.status_code}")
+        print("📩 SMS sent:", sms.sid)
     except Exception as e:
-        print(f"❌ Error sending alert: {e}")
+        print("❌ Failed to send SMS:", e)
 
-# Run the loop to capture frames
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("❌ Failed to grab frame")
-        break
+print("🚀 Script started...")
 
-    # Resize the frame to make processing faster
-    frame_resized = cv2.resize(frame, (640, 480))  # Resize to 640x480
+# Load YOLO model
+print("📦 Loading YOLOv8 model...")
+model = YOLO('yolov8n.pt')  # Using a smaller YOLO model for faster processing
+class_names = model.names
+print("✅ Model loaded.")
 
-    # Run YOLO detection
-    results = model(frame_resized)
+# Start webcam
+cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    print("❌ Failed to open webcam.")
+    exit()
+else:
+    print("🎥 Webcam opened.")
 
-    # Extract detection results
-    for result in results:
-        for obj in result.boxes:
-            class_name = obj.cls[0]  # Get the class of the detected object
-            confidence = obj.conf[0]  # Get the confidence level
-            if class_name == 0 and confidence > 0.5:  # Class 0 is 'person' in YOLO
-                print("✅ Detected person!")
+# Main loop to process webcam frames
+try:
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("❌ Failed to read from webcam.")
+            break
+
+        print("📸 Frame captured, running YOLO...")
+        results = model.predict(frame, stream=True)
+        detected = False
+        alert_label = None
+
+        # Loop through results and process detections
+        for r in results:
+            for box in r.boxes:
+                cls = int(box.cls[0])
+                conf = float(box.conf[0])
+                label = class_names[cls]
+                print(f"✅ Detected: {label} with confidence: {conf:.2f}")
+
+                # Filter detection based on confidence and target label
+                if label in target_labels and conf > 0.3:
+                    # Draw bounding box on the frame
+                    xyxy = box.xyxy[0].cpu().numpy().astype(int)
+                    x1, y1, x2, y2 = xyxy
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(frame, label, (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+                    detected = True
+                    alert_label = label  # ✅ track label for alert
+
+        # Send alert only once in the cooldown period
+        if detected and (time.time() - last_alert_time > cooldown_seconds):
+            try:
+                print("📱 Sending alert to server and SMS...")
                 
-                # Send an alert to the server
-                send_alert_to_server(type="Person Detected", location="Living Room")
-                
-                # Save video clip (optional)
-                cv2.imwrite("detected_person.jpg", frame)
+                response = requests.post("http://127.0.0.1:5000/alert", data={
+                    "message": f"{alert_label.capitalize()} detected at Hostel Camera 1",
+                    "severity": "high",  # or "medium", depending on context
+                    "incident_type": alert_label
+          })
+                print("🌐 Server responded with:", response.status_code, response.text)
+                    
+                send_sms_alert("🚨 Emergency detected by AI system!")
+                last_alert_time = time.time()
+            except Exception as e:
+                print("❌ Failed to send request or SMS:", e)
 
-    # Display the frame
-    cv2.imshow("YOLO Detection", frame)
+        # Display resized frame
+        resized_frame = cv2.resize(frame, (800, 600))
+        cv2.imshow("YOLOv8 Detection", resized_frame)
 
-    # Break loop if 'q' is pressed
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+        # Press 'q' to quit
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            print("👋 Quitting...")
+            break
 
-# Release resources
-cap.release()
-cv2.destroyAllWindows()
+finally:
+    cap.release()
+    cv2.destroyAllWindows()
+    print("🔚 Cleanup complete.")

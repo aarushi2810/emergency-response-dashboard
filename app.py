@@ -1,11 +1,15 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+import os
+import joblib
+import pandas as pd
+from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from flask_paginate import Pagination, get_page_parameter
 from datetime import datetime
-import os
-import logging
-import bleach
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -33,6 +37,43 @@ class Alert(db.Model):
     @classmethod
     def validate_incident_type(cls, value):
         return value in cls.INCIDENT_TYPE_CHOICES
+
+# Initialize the database and train model if needed
+@app.before_request
+def initialize_db():
+    if not os.path.exists("alerts.db"):
+        with app.app_context():
+            db.create_all()
+
+    # Train the Naive Bayes model if not already trained
+    if not os.path.exists('alert_classifier.pkl'):
+        # Sample data for training (replace with actual dataset)
+        data = [
+            {"message": "Fire alarm triggered in the kitchen", "incident_type": "fire"},
+            {"message": "Car accident on highway", "incident_type": "accident"},
+            {"message": "Medical emergency, heart attack", "incident_type": "medical"},
+            {"message": "Chemical spill in lab", "incident_type": "other"}
+        ]
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(data)
+
+        # Feature (text messages) and Target (incident type)
+        X = df["message"]
+        y = df["incident_type"]
+
+        # Split the data into training and test sets
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        # Create a pipeline with TF-IDF vectorization and Naive Bayes classifier
+        model = make_pipeline(TfidfVectorizer(), MultinomialNB())
+
+        # Train the model
+        model.fit(X_train, y_train)
+
+        # Save the trained model to a file
+        joblib.dump(model, 'alert_classifier.pkl')
+        print("Model trained and saved as alert_classifier.pkl")
 
 # Routes
 @app.route("/", methods=["GET"])
@@ -69,11 +110,18 @@ def receive_alert():
         if not Alert.validate_incident_type(incident_type):
             return jsonify({"error": f"Invalid incident type. Must be one of: {Alert.INCIDENT_TYPE_CHOICES}"}), 400
 
-        new_alert = Alert(message=message, severity=severity, incident_type=incident_type)
+        # Load the trained model
+        model = joblib.load('alert_classifier.pkl')
+
+        # Predict the incident type using the model
+        predicted_type = model.predict([message])[0]
+
+        # Create and save the alert
+        new_alert = Alert(message=message, severity=severity, incident_type=predicted_type)
         db.session.add(new_alert)
         db.session.commit()
 
-        return jsonify({"status": "Alert stored", "alert_id": new_alert.id}), 200
+        return jsonify({"status": "Alert stored", "alert_id": new_alert.id, "predicted_type": predicted_type}), 200
 
     except Exception as e:
         return jsonify({"error": "Server error", "details": str(e)}), 500
@@ -87,13 +135,6 @@ def page_not_found(e):
 def internal_server_error(e):
     return render_template("500.html"), 500
 
-# Run
+# Run the app
 if __name__ == "__main__":
-    if not os.path.exists("alerts.db"):
-        with app.app_context():
-            db.create_all()
-<<<<<<< HEAD
     app.run(debug=True)
-=======
-    app.run(debug=True)
->>>>>>> 616c2fe (Add: Flask dashboard with logging and templates)

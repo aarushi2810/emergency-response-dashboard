@@ -6,7 +6,14 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
+    <header>
 <h1>Emergency Alerts Dashboard</h1>
+</header>
+<main>
+<section>
+    <h2>Welcome!</h2>
+    <p>This is the Smart ERS dashboard.</p>
+  </section>
 
 <form class="filter-form" method="get" action="/">
     <label for="severity">Severity:</label>
@@ -22,18 +29,32 @@
 
     <button type="submit">Filter</button>
 </form>
+<br>
+<div id="spinner" class="spinner" style="display: none;">Loading...</div>
+<div id="alertContainer">
+    <div id="alertContainer">
+        {% for alert in alerts %}
+          <div class="alert-card default {{ alert.severity|lower }}">
+            <h3>{{ alert.incident_type or "Emergency Alert" }}</h3>
+            <p><strong>Message:</strong> {{ alert.message or "N/A" }}</p>
+            <div class="card-footer">
+              <small class="text-muted">{{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+              <span class="badge {{ 
+                  'bg-success' if alert.severity.lower() == 'low' else 
+                  'bg-warning' if alert.severity.lower() == 'medium' else 
+                  'bg-orange' if alert.severity.lower() == 'high' else 
+                  'bg-danger' if alert.severity.lower() == 'critical' else 
+                  'bg-secondary' 
+              }}">{{ alert.severity }}</span>
+            </div>
+          </div>
+        {% else %}
+          <p>No alerts found.</p>
+        {% endfor %}
+      </div>
+      
 
-{% for alert in alerts %}
-    <div class="alert">
-        <strong>[{{ alert.severity|capitalize }}] {{ alert.incident_type|capitalize }}</strong><br>
-        {{ alert.message }}<br>
-        <small>{{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
-    </div>
-{% else %}
-    <p>No alerts found.</p>
-{% endfor %}
-
-<div class="pagination">
+<div>
     {% if pagination.has_prev %}
         <a href="?page={{ pagination.prev_num }}&severity={{ request.args.get('severity', '') }}&incident_type={{ request.args.get('incident_type', '') }}">« Prev</a>
     {% endif %}
@@ -51,6 +72,7 @@
     {% if pagination.has_next %}
         <a href="?page={{ pagination.next_num }}&severity={{ request.args.get('severity', '') }}&incident_type={{ request.args.get('incident_type', '') }}">Next »</a>
     {% endif %}
-</div>
+</div></div></main>
+
 </body>
 </html>

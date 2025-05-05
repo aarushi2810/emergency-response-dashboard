@@ -115,6 +115,7 @@ def receive_alert():
 
         # Load the trained model
         model = joblib.load('alert_classifier.pkl')
+        print("✅ Alert Classifier Model loaded successfully.")
 
         # Predict the incident type using the model
         predicted_type = model.predict([message])[0]
